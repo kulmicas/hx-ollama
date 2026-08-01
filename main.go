@@ -36,8 +36,8 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = ":pipe-to hx-ollama explain"
-a = "@:pipe-to<space>hx-ollama<space>ask<space>"
+x = ":sh hx-ollama -f %val{filename} explain"
+a = "@:sh<space>hx-ollama<space>-f<space>%val{filename}<space>ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 `
@@ -457,6 +457,7 @@ func main() {
 	if stdinText == "" && flagFile != "" {
 		if data, err := os.ReadFile(flagFile); err == nil {
 			stdinText = string(data)
+			flagKeepCode = false
 		}
 	}
 	sysPrompt := systemPromptEdit
