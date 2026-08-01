@@ -431,11 +431,13 @@ int main(int argc, char **argv) {
     char *resp_body = http_request("POST", host, "/api/generate", payload);
     free(payload);
 
+    int success = 0;
+
     if (resp_body) {
         cJSON *resp_json = cJSON_Parse(resp_body);
         if (resp_json) {
             cJSON *response_item = cJSON_GetObjectItem(resp_json, "response");
-            if (response_item && response_item->valuestring) {
+            if (response_item && response_item->valuestring && *response_item->valuestring) {
                 char *formatted = format_output(response_item->valuestring, code_only);
                 if (keep_code && stdin_text && *stdin_text) {
                     printf("%s\n\n---\n### 💡 Code Explanation\n%s\n", stdin_text, formatted);
@@ -443,10 +445,21 @@ int main(int argc, char **argv) {
                     printf("%s", formatted);
                 }
                 free(formatted);
+                success = 1;
             }
             cJSON_Delete(resp_json);
         }
         free(resp_body);
+    }
+
+    // Fallback: If Ollama failed or returned empty response, preserve original code so Helix doesn't delete selection!
+    if (!success) {
+        if (stdin_text && *stdin_text) {
+            printf("%s", stdin_text);
+        }
+        fprintf(stderr, "\n[hx-ollama Error: Failed to generate response from Ollama at %s. Make sure Ollama is running ('ollama serve') and model '%s' is installed]\n", host, model);
+        if (stdin_text) free(stdin_text);
+        return 1;
     }
 
     if (stdin_text) free(stdin_text);
