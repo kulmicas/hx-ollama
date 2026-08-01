@@ -21,21 +21,35 @@
 
 ---
 
-## 📦 Installation
+## 📦 Production Setup & Installation
 
-### Option 1: Install via pip / pipx
+### Option 1: 1-Command Automated Install (Local or Remote)
+
+Clone this repository and run the automated installer:
 ```bash
-# From local source repository
-pip install .
-
-# Or using pipx
-pipx install .
+git clone https://github.com/your-username/hx-ollama.git
+cd hx-ollama
+./install.sh
 ```
 
-### Option 2: Symlink Executable to PATH
+*(This automatically installs `hx-ollama` to your PATH and appends the keybindings to `~/.config/helix/config.toml`!)*
+
+---
+
+### Option 2: Install via `pipx` or `pip`
+
 ```bash
-chmod +x bin/hx-ollama
-ln -s "$(pwd)/bin/hx-ollama" ~/.local/bin/hx-ollama
+# Install globally via pipx (Recommended for CLI apps)
+pipx install git+https://github.com/your-username/hx-ollama.git
+
+# Auto-configure Helix keybindings
+hx-ollama install-helix
+```
+
+Or from local source:
+```bash
+pipx install .
+hx-ollama install-helix
 ```
 
 ---

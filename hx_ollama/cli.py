@@ -116,6 +116,28 @@ Examples:
         print(HELIX_CONFIG_SNIPPET)
         return
 
+    if action in ("install-helix", "init-helix"):
+        helix_config_dir = os.path.expanduser("~/.config/helix")
+        helix_config_file = os.path.join(helix_config_dir, "config.toml")
+        os.makedirs(helix_config_dir, exist_ok=True)
+
+        existing_content = ""
+        if os.path.exists(helix_config_file):
+            with open(helix_config_file, "r", encoding="utf-8") as f:
+                existing_content = f.read()
+
+        if "hx-ollama" in existing_content:
+            print(f"[hx-ollama] Notice: hx-ollama configuration is already present in {helix_config_file}")
+            return
+
+        with open(helix_config_file, "a", encoding="utf-8") as f:
+            if existing_content and not existing_content.endswith("\n"):
+                f.write("\n")
+            f.write(HELIX_CONFIG_SNIPPET)
+
+        print(f"✅ Successfully appended hx-ollama keybindings to {helix_config_file}!")
+        return
+
     # Determine command mode & system prompt
     code_only = True
     keep_code = args.keep_code
