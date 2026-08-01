@@ -36,8 +36,8 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = ":pipe hx-ollama explain"
-a = "@|hx-ollama ask<space>"
+x = ":sh hx-ollama -f %val{filename} explain"
+a = "@:sh<space>hx-ollama<space>-f<space>%val{filename}<space>ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 `
@@ -347,6 +347,7 @@ func main() {
 	var (
 		flagHost     string
 		flagModel    string
+		flagFile     string
 		flagRaw      bool
 		flagMarkdown bool
 		flagKeepCode bool
@@ -357,6 +358,8 @@ func main() {
 	flag.StringVar(&flagHost, "host", "", "Specify Ollama host URL")
 	flag.StringVar(&flagModel, "m", "", "Specify model name")
 	flag.StringVar(&flagModel, "model", "", "Specify model name")
+	flag.StringVar(&flagFile, "f", "", "Specify file path to read code context from")
+	flag.StringVar(&flagFile, "file", "", "Specify file path to read code context from")
 	flag.BoolVar(&flagRaw, "raw", false, "Force raw code output")
 	flag.BoolVar(&flagMarkdown, "markdown", false, "Preserve markdown output")
 	flag.BoolVar(&flagKeepCode, "keep-code", false, "Preserve original code selection")
@@ -451,6 +454,11 @@ func main() {
 	}
 
 	stdinText := readStdin()
+	if stdinText == "" && flagFile != "" {
+		if data, err := os.ReadFile(flagFile); err == nil {
+			stdinText = string(data)
+		}
+	}
 	sysPrompt := systemPromptEdit
 	codeOnly := true
 

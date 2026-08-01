@@ -106,8 +106,8 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = ":pipe hx-ollama explain"
-a = "@|hx-ollama ask<space>"
+x = ":sh hx-ollama -f %val{filename} explain"
+a = "@:sh<space>hx-ollama<space>-f<space>%val{filename}<space>ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 ```
