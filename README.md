@@ -106,14 +106,16 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = ":pipe-to hx-ollama explain"
-a = "@:pipe-to<space>hx-ollama<space>ask<space>"
+x = "@y:vnew<ret>p:pipe hx-ollama explain<ret>:set-language markdown<ret>"
+a = "@y:vnew<ret>p:pipe hx-ollama ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 ```
 
-> **Note on Helix Popup Overlays (`:pipe-to`)**:
-> Helix has a built-in command **`:pipe-to`**. It pipes your visual code selection into `hx-ollama` via `stdin`, but instead of replacing your code in the buffer, it displays the AI's response inside Helix's **built-in terminal output popup overlay** at the bottom of your screen. Your source code file remains **100% untouched**.
+> **Note on Scratchpad Split Explanations (`Space + o + x` & `Space + o + a`)**:
+> - `Space + o + x`: Yanks your selection, opens a vertical Markdown scratchpad split (`:vnew`), and populates it with the AI's code breakdown.
+> - `Space + o + a`: Yanks your selection into a vertical split and opens `:pipe hx-ollama ask ` with your cursor blinking ready for **any custom question**.  
+> Your original source file remains **100% untouched** on the left.
 
 ---
 
@@ -123,8 +125,8 @@ c = ":pipe hx-ollama complete"
 | :--- | :--- | :--- | :--- |
 | `edit [prompt]` | Refactors selection based on prompt instruction | `Space + o + e` | Raw Code Replacement |
 | `fix` | Analyzes selection and fixes bugs or syntax errors | `Space + o + f` | Raw Code Replacement |
-| `explain` | Explains selected code in Helix popup overlay | `Space + o + x` | Helix Terminal Popup (`:pipe-to`) |
-| `ask [question]` | Answers custom question in Helix popup overlay | `Space + o + a` | Helix Terminal Popup (`:pipe-to`) |
+| `explain` | Explains selected code in side-by-side scratchpad | `Space + o + x` | Markdown Scratchpad Split |
+| `ask [question]` | Answers custom question about selection in split | `Space + o + a` | Markdown Scratchpad Split |
 | `docs` | Adds docstrings, comments, and type hints to selection | `Space + o + d` | Raw Code Replacement |
 | `complete` | Fills in missing functions or logic implementations | `Space + o + c` | Raw Code Replacement |
 | `generate <prompt>` | Generates new code from scratch | `Space + o + g` | Raw Code Insertion |
