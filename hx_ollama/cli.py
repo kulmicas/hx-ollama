@@ -84,6 +84,7 @@ Examples:
     parser.add_argument("--host", help="Ollama host URL (default: http://localhost:11434)")
     parser.add_argument("--raw", action="store_true", help="Force raw code output (strip code fences)")
     parser.add_argument("--markdown", action="store_true", help="Preserve markdown output (do not strip code fences)")
+    parser.add_argument("--keep-code", action="store_true", help="Preserve original piped code and append response below it")
 
     args = parser.parse_args()
 
@@ -117,6 +118,7 @@ Examples:
 
     # Determine command mode & system prompt
     code_only = True
+    keep_code = args.keep_code
     system_prompt = SYSTEM_PROMPT_EDIT
     user_prompt = ""
 
@@ -127,6 +129,7 @@ Examples:
         system_prompt = SYSTEM_PROMPT_EXPLAIN
         user_prompt = extra_prompt or "Explain this code in detail."
         code_only = False
+        keep_code = True  # Preserve original code selection so explain doesn't wipe out code in Helix
     elif action == "docs":
         system_prompt = SYSTEM_PROMPT_DOCS
         user_prompt = extra_prompt or "Add clear docstrings and comments to this code."
@@ -187,6 +190,11 @@ Examples:
             temperature=temp,
         )
         formatted = format_output(raw_response, code_only=code_only)
+
+        # If keep_code is enabled and stdin_content exists, preserve original code above the explanation
+        if keep_code and stdin_content:
+            formatted = f"{stdin_content.rstrip()}\n\n---\n### 💡 Code Explanation\n{formatted}\n"
+
         print(formatted, end="")
     except Exception as e:
         print(f"[hx-ollama] Error executing Ollama request: {e}", file=sys.stderr)
