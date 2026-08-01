@@ -1,25 +1,19 @@
-# Makefile for building hx-ollama static binaries
+# Makefile for building hx-ollama static binaries (C and Go)
 
 BINARY_NAME=hx-ollama
-BUILD_DIR=dist
+CC?=gcc
+CFLAGS?=-O3 -Wall
 
-.PHONY: all build clean release
+.PHONY: all c-build go-build clean release
 
-all: build
+all: c-build
 
-build:
+c-build:
+	$(CC) $(CFLAGS) hx-ollama.c cJSON.c -o bin/$(BINARY_NAME)
+
+go-build:
 	go build -ldflags="-s -w" -o bin/$(BINARY_NAME) main.go
 
-release:
-	mkdir -p $(BUILD_DIR)
-	# macOS Apple Silicon (arm64)
-	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 main.go
-	# macOS Intel (amd64)
-	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 main.go
-	# Linux (amd64 / Arch Linux)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 main.go
-	# Linux ARM64 (Raspberry Pi / Arch ARM)
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 main.go
-
 clean:
-	rm -rf bin/$(BINARY_NAME) $(BUILD_DIR)
+	rm -rf bin/$(BINARY_NAME) bin/hx-ollama-c dist
+
