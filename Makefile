@@ -1,19 +1,23 @@
-# Makefile for building hx-ollama static binaries (C and Go)
+# Makefile for hx-ollama (Pure C Static Binary)
 
-BINARY_NAME=hx-ollama
-CC?=gcc
-CFLAGS?=-O3 -Wall
+BINARY_NAME = hx-ollama
+CC ?= gcc
+CFLAGS ?= -O3 -Wall
+INSTALL_DIR ?= $(HOME)/.local/bin
 
-.PHONY: all c-build go-build clean release
+.PHONY: all build install clean
 
-all: c-build
+all: build
 
-c-build:
+build:
+	@mkdir -p bin
 	$(CC) $(CFLAGS) hx-ollama.c cJSON.c -o bin/$(BINARY_NAME)
 
-go-build:
-	go build -ldflags="-s -w" -o bin/$(BINARY_NAME) main.go
+install: build
+	@mkdir -p $(INSTALL_DIR)
+	cp bin/$(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME)
+	chmod +x $(INSTALL_DIR)/$(BINARY_NAME)
+	@echo "✅ Installed hx-ollama binary to $(INSTALL_DIR)/$(BINARY_NAME)"
 
 clean:
-	rm -rf bin/$(BINARY_NAME) bin/hx-ollama-c dist
-
+	rm -rf bin/
