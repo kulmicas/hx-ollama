@@ -37,7 +37,7 @@ m = ":sh hx-ollama models"
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
 x = "@y:vnew<ret>p:pipe hx-ollama explain<ret>:set-language markdown<ret>"
-a = "@y:vnew<ret>p@|hx-ollama ask<space>"
+a = "@:sh<space>hx-ollama<space>ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 `
