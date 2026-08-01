@@ -36,8 +36,8 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = [":vnew", ":insert-output hx-ollama explain", ":set-language markdown"]
-a = "@:vnew<ret>:insert-output<space>hx-ollama<space>ask<space>"
+x = "@y:vnew<ret>p:pipe hx-ollama explain<ret>:set-language markdown<ret>"
+a = "@y:vnew<ret>p|hx-ollama ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 `
