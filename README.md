@@ -4,7 +4,7 @@
 
 > [!WARNING]
 > ⚠️ **WARNING: THIS IS PURE AI SLOP!** 🤖✨  
-> I made this to try out **vibecoding** with Google's **Antigravity**. It compiles into a zero-dependency static binary, works surprisingly fast, and hasn't blown up my computer yet. Use at your own risk, or vibe along! 🏄‍♂️
+> I made this to try out **vibecoding** with Google's **Antigravity**.
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
