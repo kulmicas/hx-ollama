@@ -194,26 +194,43 @@ static void load_config_file(char *host_out, size_t host_size, char *model_out, 
     fclose(f);
 }
 
+static void parse_url(const char *url, char *host_out, size_t host_sz, int *port_out) {
+    *port_out = 11434;
+    strncpy(host_out, "localhost", host_sz - 1);
+    host_out[host_sz - 1] = '\0';
+    
+    if (!url || !*url) return;
+
+    const char *p = url;
+    if (strncasecmp(p, "http://", 7) == 0) p += 7;
+    else if (strncasecmp(p, "https://", 8) == 0) p += 8;
+
+    char clean[256];
+    strncpy(clean, p, sizeof(clean) - 1);
+    clean[sizeof(clean) - 1] = '\0';
+    
+    char *slash = strchr(clean, '/');
+    if (slash) *slash = '\0';
+
+    char *colon = strchr(clean, ':');
+    if (colon) {
+        *colon = '\0';
+        int pt = atoi(colon + 1);
+        if (pt > 0) *port_out = pt;
+    }
+
+    if (clean[0] != '\0' && strcmp(clean, "http") != 0 && strcmp(clean, "https") != 0) {
+        strncpy(host_out, clean, host_sz - 1);
+        host_out[host_sz - 1] = '\0';
+    }
+}
+
 // Socket HTTP Request (GET or POST)
 static char *http_request(const char *method, const char *host_url, const char *path, const char *json_payload) {
-    char hostname[256] = "localhost";
-    int port = 11434;
+    char hostname[256];
+    int port;
 
-    const char *p = host_url;
-    if (strncmp(p, "http://", 7) == 0) p += 7;
-    else if (strncmp(p, "https://", 8) == 0) p += 8;
-
-    char *colon = strchr(p, ':');
-    if (colon) {
-        size_t hlen = colon - p;
-        if (hlen < sizeof(hostname)) {
-            strncpy(hostname, p, hlen);
-            hostname[hlen] = '\0';
-        }
-        port = atoi(colon + 1);
-    } else {
-        strncpy(hostname, p, sizeof(hostname) - 1);
-    }
+    parse_url(host_url, hostname, sizeof(hostname), &port);
 
     struct hostent *server = gethostbyname(hostname);
     if (!server) {
