@@ -49,15 +49,17 @@ Run `hx-ollama setup-helix` to print recommended configuration, or add the follo
 # Helix Editor + Ollama AI Integration (hx-ollama)
 # ==============================================================================
 
-# Normal Mode Shortcuts (e.g. Space + a + g to append generated code)
+# Normal Mode Shortcuts (Space + a)
+# Uses Macro syntax (@) to open prompt pre-filled so you can type your instruction!
 [keys.normal.space.a]
-g = ":append-output hx-ollama generate "
-i = ":insert-output hx-ollama generate "
+g = "@:append-output<space>hx-ollama<space>generate<space>"
+i = "@:insert-output<space>hx-ollama<space>generate<space>"
 m = ":sh hx-ollama models"
 
-# Visual / Selection Mode Shortcuts (e.g. Space + a + e to edit selection)
+# Visual / Selection Mode Shortcuts (Space + a)
 [keys.select.space.a]
-e = ":pipe hx-ollama edit "
+# '@|' simulates pressing '|' and pre-fills 'hx-ollama edit ', leaving cursor open for your prompt
+e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
 x = ":pipe hx-ollama explain"
 d = ":pipe hx-ollama docs"
