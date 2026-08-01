@@ -115,16 +115,58 @@ static char *read_stdin_nonblocking(void) {
     return NULL;
 }
 
+// Config file template with comments
+static void create_default_config_file(const char *cfg_path) {
+    FILE *f = fopen(cfg_path, "w");
+    if (!f) {
+        perror("[hx-ollama] Could not create config file");
+        return;
+    }
+    
+    const char *template_json = 
+        "{\n"
+        "  \"_comment_host\": \"URL of local or LAN Ollama server. Examples: http://localhost:11434 or http://192.168.1.100:11434\",\n"
+        "  \"host\": \"http://localhost:11434\",\n\n"
+        "  \"_comment_model\": \"Ollama model tag for coding (e.g. qwen2.5-coder:14b-instruct, deepseek-r1, codellama)\",\n"
+        "  \"model\": \"qwen2.5-coder:14b-instruct\",\n\n"
+        "  \"_comment_temperature\": \"Sampling temperature from 0.0 (precise code refactoring) to 1.0 (creative generation)\",\n"
+        "  \"temperature\": 0.2\n"
+        "}\n";
+        
+    fputs(template_json, f);
+    fclose(f);
+}
+
+static void ensure_dir_exists(const char *path) {
+    char tmp[512];
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0755);
+}
+
 // Config file reader (~/.config/hx-ollama/config.json)
 static void load_config_file(char *host_out, size_t host_size, char *model_out, size_t model_size) {
     const char *home = getenv("HOME");
     if (!home) return;
     
-    char cfg_path[512];
-    snprintf(cfg_path, sizeof(cfg_path), "%s/.config/hx-ollama/config.json", home);
+    char cfg_dir[512], cfg_path[512];
+    snprintf(cfg_dir, sizeof(cfg_dir), "%s/.config/hx-ollama", home);
+    snprintf(cfg_path, sizeof(cfg_path), "%s/config.json", cfg_dir);
+
+    ensure_dir_exists(cfg_dir);
     
     FILE *f = fopen(cfg_path, "r");
-    if (!f) return;
+    if (!f) {
+        create_default_config_file(cfg_path);
+        f = fopen(cfg_path, "r");
+        if (!f) return;
+    }
     
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);

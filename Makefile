@@ -17,6 +17,8 @@ install: build
 	@mkdir -p $(INSTALL_DIR)
 	cp bin/$(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME)
 	chmod +x $(INSTALL_DIR)/$(BINARY_NAME)
+	@echo "⚙️ Initializing configuration..."
+	$(INSTALL_DIR)/$(BINARY_NAME) setup
 	@echo "✅ Installed hx-ollama binary to $(INSTALL_DIR)/$(BINARY_NAME)"
 
 clean:
