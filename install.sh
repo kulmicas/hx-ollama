@@ -42,18 +42,10 @@ echo "-----------------------------------------------------------------"
 if prompt_confirm "Do you want to install hx-ollama to ${INSTALL_DIR}?"; then
     if [ "$DRY_RUN" = false ]; then
         mkdir -p "${INSTALL_DIR}"
-        if command -v pipx >/dev/null 2>&1; then
-            echo "📦 Installing via pipx to isolated environment..."
-            pipx install --force .
-        elif command -v pip3 >/dev/null 2>&1; then
-            echo "📦 Installing via pip3..."
-            pip3 install --user --break-system-packages .
-        else
-            echo "⚡ Copying standalone executable to ${TARGET_BIN}..."
-            cp bin/hx-ollama "${TARGET_BIN}"
-            chmod +x "${TARGET_BIN}"
-        fi
-        echo "✅ Installed binary successfully."
+        echo "⚡ Copying standalone executable to ${TARGET_BIN}..."
+        cp bin/hx-ollama "${TARGET_BIN}"
+        chmod +x "${TARGET_BIN}"
+        echo "✅ Installed binary successfully to ${TARGET_BIN}."
     fi
 else
     echo "⏭️  Skipped binary installation."
