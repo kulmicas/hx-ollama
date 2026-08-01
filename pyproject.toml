@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hx-ollama"
+version = "0.1.0"
+description = "Ollama AI Integration for Helix Editor via Pipe (|) and Append/Insert Output"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Antigravity Team"}
+]
+keywords = ["helix", "ollama", "editor", "ai", "pipe", "refactor", "llm"]
+
+[project.scripts]
+hx-ollama = "hx_ollama.cli:main"

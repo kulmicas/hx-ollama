@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+import sys
+import os
+
+# Ensure hx_ollama package can be loaded if run directly from repo or bin directory
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from hx_ollama.cli import main
+
+if __name__ == "__main__":
+    main()
