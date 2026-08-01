@@ -37,6 +37,7 @@ m = ":sh hx-ollama models"
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
 x = [":vnew", ":insert-output hx-ollama explain", ":set-language markdown"]
+a = "@:vnew<ret>:insert-output<space>hx-ollama<space>ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 `
@@ -69,6 +70,10 @@ const systemPromptComplete = "You are an expert AI software developer integrated
 	"Your task is to complete missing code, logic, or function implementations in the provided selection.\n" +
 	"CRITICAL RULE: Output ONLY the complete code. Do NOT wrap your output in markdown code blocks or ``` ``` fences.\n" +
 	"Do NOT include any introduction, explanations, or conversational text."
+
+const systemPromptAsk = "You are an expert AI technical assistant.\n" +
+	"Analyze the provided code selection and answer the user's specific request or question clearly.\n" +
+	"Use markdown headings, bullet points, and code snippets where helpful."
 
 const systemPromptGenerate = "You are an expert AI software developer integrated into Helix text editor.\n" +
 	"Generate clean, production-ready code based on the user's prompt instruction.\n" +
@@ -460,6 +465,10 @@ func main() {
 		sysPrompt = systemPromptExplain
 		codeOnly = false
 		flagKeepCode = true
+	case "ask":
+		sysPrompt = systemPromptAsk
+		codeOnly = false
+		flagKeepCode = false
 	case "docs":
 		sysPrompt = systemPromptDocs
 	case "complete":

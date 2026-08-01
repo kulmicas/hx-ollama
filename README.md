@@ -107,12 +107,15 @@ m = ":sh hx-ollama models"
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
 x = [":vnew", ":insert-output hx-ollama explain", ":set-language markdown"]
+a = "@:vnew<ret>:insert-output<space>hx-ollama<space>ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 ```
 
-> **Note on Side-by-Side Explanation Scratchpad (`Space + o + x`)**:
-> `Space + o + x` opens a side-by-side vertical scratchpad split (`:vnew`), streams the AI's structured explanation into the new window, and applies Markdown syntax highlighting. Your original source file remains **100% untouched** on the left.
+> **Note on Custom Questions (`Space + o + a`) & Explain Scratchpad (`Space + o + x`)**:
+> - `Space + o + a`: Opens a Markdown scratchpad split (`:vnew`), leaving your cursor blinking so you can **type any custom question** about your selection!
+> - `Space + o + x`: Streams a structured code breakdown into the scratchpad split.  
+> Your original source file remains **100% untouched** on the left.
 
 ---
 
@@ -123,6 +126,7 @@ c = ":pipe hx-ollama complete"
 | `edit [prompt]` | Refactors selection based on prompt instruction | `Space + o + e` | Raw Code |
 | `fix` | Analyzes selection and fixes bugs or syntax errors | `Space + o + f` | Raw Code |
 | `explain` | Explains selected code in side-by-side split | `Space + o + x` | Markdown Scratchpad Split |
+| `ask [question]` | Answers any custom question about selection in split | `Space + o + a` | Markdown Scratchpad Split |
 | `docs` | Adds docstrings, comments, and type hints to selection | `Space + o + d` | Raw Code |
 | `complete` | Fills in missing functions or logic implementations | `Space + o + c` | Raw Code |
 | `generate <prompt>` | Generates new code from scratch | `Space + o + g` | Raw Code |
