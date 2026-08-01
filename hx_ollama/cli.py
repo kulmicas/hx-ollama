@@ -20,16 +20,16 @@ HELIX_CONFIG_SNIPPET = """
 # Helix Editor + Ollama AI Integration (hx-ollama)
 # ==============================================================================
 
-# Normal Mode Keybindings (Space + a)
-[keys.normal.space.a]
-# Uses Macro syntax (@) to open prompt pre-filled with command so you can type your prompt!
+# Normal Mode Keybindings (Space + o for Ollama)
+[keys.normal.space.o]
+# Uses Macro syntax (@) to open prompt pre-filled so you can type your instruction!
 g = "@:append-output<space>hx-ollama<space>generate<space>"
 i = "@:insert-output<space>hx-ollama<space>generate<space>"
 m = ":sh hx-ollama models"
 
-# Visual / Selection Mode Keybindings (Space + a)
-[keys.select.space.a]
-# Opens pipe prompt pre-filled with 'hx-ollama edit ' leaving cursor blinking for prompt
+# Visual / Selection Mode Keybindings (Space + o for Ollama)
+[keys.select.space.o]
+# Opens pipe prompt pre-filled with 'hx-ollama edit ', leaving cursor open for your instruction!
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
 x = ":pipe hx-ollama explain"
