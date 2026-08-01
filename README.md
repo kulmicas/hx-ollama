@@ -21,36 +21,25 @@
 
 ---
 
-## 📦 Production Setup & Installation
+## 📦 Safe & Interactive Installation
 
-### Option 1: 1-Command Automated Install (Local or Remote)
+`hx-ollama` includes a safe, interactive installer (`./install.sh`) that asks for your confirmation before modifying any directory or file, showing exact target paths and content diffs.
 
-Clone this repository and run the automated installer:
 ```bash
 git clone https://github.com/your-username/hx-ollama.git
 cd hx-ollama
+
+# Optional: Run a dry run first to inspect what will change without modifying anything:
+./install.sh --dry-run
+
+# Run the interactive setup:
 ./install.sh
 ```
 
-*(This automatically installs `hx-ollama` to your PATH and appends the keybindings to `~/.config/helix/config.toml`!)*
-
----
-
-### Option 2: Install via `pipx` or `pip`
-
-```bash
-# Install globally via pipx (Recommended for CLI apps)
-pipx install git+https://github.com/your-username/hx-ollama.git
-
-# Auto-configure Helix keybindings
-hx-ollama install-helix
-```
-
-Or from local source:
-```bash
-pipx install .
-hx-ollama install-helix
-```
+### What the Installer Does (With Your Permission):
+1. **Installs Binary**: Copies `hx-ollama` executable to `~/.local/bin/hx-ollama` (or via `pipx`).
+2. **Creates Configuration**: Places default config at `~/.config/hx-ollama/config.json` (will **never** overwrite if it already exists).
+3. **Appends Keybindings**: Displays the exact `Space + o` TOML keybinding snippet and asks before appending to `~/.config/helix/config.toml` (will **never** duplicate if already added).
 
 ---
 
