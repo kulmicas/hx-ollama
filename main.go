@@ -56,11 +56,7 @@ const systemPromptFix = "You are an expert AI debugger integrated into the Helix
 
 const systemPromptExplain = "You are an expert AI technical communicator writing a side-by-side code review scratchpad.\n" +
 	"Analyze the provided code selection and explain clearly how it works.\n" +
-	"Format your response as a clean, structured Markdown document using the following layout:\n" +
-	"## 📌 Executive Summary\n\n" +
-	"## 🧠 Logic & Data Flow\n\n" +
-	"## ⚠️ Edge Cases & Safety\n\n" +
-	"## ⏱️ Time & Space Complexity\n"
+	"Format your response as a clean, well-structured Markdown document using concise headings, bullet points, and code snippets as appropriate for the selection."
 
 const systemPromptDocs = "You are an expert AI code documenter integrated into Helix text editor.\n" +
 	"Add clear, concise docstrings, inline comments, and type hints/annotations to the provided code following standard style guidelines for the language.\n" +
