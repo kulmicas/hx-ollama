@@ -6,7 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,7 @@ import (
 )
 
 const (
+	version      = "1.0.0"
 	defaultHost  = "http://localhost:11434"
 	defaultModel = "qwen2.5-coder:14b-instruct"
 )
@@ -23,11 +26,13 @@ const helixConfigSnippet = `
 # Helix Editor + Ollama AI Integration (hx-ollama)
 # ==============================================================================
 
+# Normal Mode Shortcuts (Space + o for Ollama)
 [keys.normal.space.o]
 g = "@:append-output<space>hx-ollama<space>generate<space>"
 i = "@:insert-output<space>hx-ollama<space>generate<space>"
 m = ":sh hx-ollama models"
 
+# Visual / Selection Mode Shortcuts (Space + o for Ollama)
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
@@ -55,6 +60,11 @@ const systemPromptExplain = "You are an expert software developer and technical 
 const systemPromptDocs = "You are an expert AI code documenter integrated into Helix text editor.\n" +
 	"Add clear, concise docstrings, inline comments, and type hints/annotations to the provided code following standard style guidelines for the language.\n" +
 	"CRITICAL RULE: Output ONLY the code with documentation added. Do NOT wrap your output in markdown code blocks or ``` ``` fences."
+
+const systemPromptComplete = "You are an expert AI software developer integrated into the Helix text editor.\n" +
+	"Your task is to complete missing code, logic, or function implementations in the provided selection.\n" +
+	"CRITICAL RULE: Output ONLY the complete code. Do NOT wrap your output in markdown code blocks or ``` ``` fences.\n" +
+	"Do NOT include any introduction, explanations, or conversational text."
 
 const systemPromptGenerate = "You are an expert AI software developer integrated into Helix text editor.\n" +
 	"Generate clean, production-ready code based on the user's prompt instruction.\n" +
@@ -84,7 +94,9 @@ type OllamaResponse struct {
 }
 
 type ModelItem struct {
-	Name string `json:"name"`
+	Name       string `json:"name"`
+	ModifiedAt string `json:"modified_at"`
+	Size       int64  `json:"size"`
 }
 
 type TagsResponse struct {
@@ -92,8 +104,7 @@ type TagsResponse struct {
 }
 
 func printHelp() {
-	fmt.Println("hx-ollama: Portable Go Static Binary for Helix Editor + Ollama AI")
-	fmt.Println()
+	fmt.Printf("hx-ollama (v%s) — Ultra-Fast Local/LAN AI Integration for Helix Editor\n\n", version)
 	fmt.Println("USAGE:")
 	fmt.Println("  hx-ollama [OPTIONS] <ACTION> [PROMPT...]")
 	fmt.Println("  echo \"code\" | hx-ollama [OPTIONS] <ACTION> [PROMPT...]")
@@ -103,17 +114,18 @@ func printHelp() {
 	fmt.Println("  fix               Analyze and fix bugs, syntax, or logic errors in selection")
 	fmt.Println("  explain           Explain selected code in detail (appends explanation below code)")
 	fmt.Println("  docs              Add docstrings, comments, and type hints to selected code")
-	fmt.Println("  complete          Complete missing logic in code selection")
+	fmt.Println("  complete          Complete missing code or logic in selection")
 	fmt.Println("  generate <prompt> Generate new code from scratch for :append-output / :insert-output")
-	fmt.Println("  models            List installed Ollama AI models on host")
+	fmt.Println("  models            List installed Ollama AI models on target host")
 	fmt.Println("  setup / init      Display file locations and print Helix configuration snippet")
 	fmt.Println()
 	fmt.Println("OPTIONS:")
-	fmt.Println("  -m <model>        Specify model (e.g. qwen2.5-coder:14b-instruct, deepseek-r1)")
-	fmt.Println("  --host <url>      Specify Ollama host URL (e.g. http://192.168.1.100:11434)")
+	fmt.Println("  -m, --model       Specify model tag (e.g. qwen2.5-coder:14b-instruct, deepseek-r1)")
+	fmt.Println("  --host            Specify Ollama host URL (e.g. http://192.168.1.100:11434)")
 	fmt.Println("  --raw             Force raw code output (strip code fences)")
 	fmt.Println("  --markdown        Preserve markdown output (do not strip code fences)")
 	fmt.Println("  --keep-code       Preserve original code selection above response")
+	fmt.Println("  -v, --version     Show version number")
 	fmt.Println("  -h, --help        Show this help screen")
 	fmt.Println()
 	fmt.Println("ENVIRONMENT VARIABLES:")
@@ -126,7 +138,7 @@ func printHelp() {
 	fmt.Println("    :pipe hx-ollama explain")
 	fmt.Println()
 	fmt.Println("  In Helix Normal Mode:")
-	fmt.Println("    :append-output hx-ollama generate \"write a fibonacci function in python\"")
+	fmt.Println("    :append-output hx-ollama generate \"write a python quicksort function\"")
 	fmt.Println()
 	fmt.Println("  In Terminal:")
 	fmt.Println("    hx-ollama models")
@@ -154,7 +166,7 @@ func loadConfig() Config {
 
 	data, err := os.ReadFile(cfgPath)
 	if os.IsNotExist(err) {
-		// Create default commented template config file
+		// Automatically generate a clean, commented configuration template
 		defaultCfg := Config{
 			CommentHost:        "URL of local or LAN Ollama server. Examples: http://localhost:11434 or http://192.168.1.100:11434",
 			Host:               defaultHost,
@@ -187,14 +199,35 @@ func loadConfig() Config {
 	return cfg
 }
 
+func normalizeHostURL(rawHost string) string {
+	rawHost = strings.TrimSpace(rawHost)
+	if rawHost == "" {
+		return defaultHost
+	}
+
+	if !strings.HasPrefix(rawHost, "http://") && !strings.HasPrefix(rawHost, "https://") {
+		rawHost = "http://" + rawHost
+	}
+
+	u, err := url.Parse(rawHost)
+	if err != nil {
+		return rawHost
+	}
+
+	if u.Port() == "" {
+		// Add default Ollama port 11434 if no port was specified
+		u.Host = net.JoinHostPort(u.Hostname(), "11434")
+	}
+
+	return strings.TrimRight(u.String(), "/")
+}
+
 func stripCodeFences(text string) string {
 	s := strings.TrimSpace(text)
 	if strings.HasPrefix(s, "```") {
 		lines := strings.Split(s, "\n")
 		if len(lines) > 1 {
-			// Remove first line ```lang
 			lines = lines[1:]
-			// Remove last line ```
 			if len(lines) > 0 && strings.HasPrefix(strings.TrimSpace(lines[len(lines)-1]), "```") {
 				lines = lines[:len(lines)-1]
 			}
@@ -202,6 +235,25 @@ func stripCodeFences(text string) string {
 		}
 	}
 	return text
+}
+
+func newHTTPClient() *http.Client {
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   300 * time.Second, // Allow deep-reasoning models like deepseek-r1 sufficient time
+	}
 }
 
 func main() {
@@ -218,18 +270,27 @@ func main() {
 		flagMarkdown bool
 		flagKeepCode bool
 		flagHelp     bool
+		flagVersion  bool
 	)
 
 	flag.StringVar(&flagHost, "host", "", "Specify Ollama host URL")
 	flag.StringVar(&flagModel, "m", "", "Specify model name")
+	flag.StringVar(&flagModel, "model", "", "Specify model name")
 	flag.BoolVar(&flagRaw, "raw", false, "Force raw code output")
 	flag.BoolVar(&flagMarkdown, "markdown", false, "Preserve markdown output")
 	flag.BoolVar(&flagKeepCode, "keep-code", false, "Preserve original code selection")
+	flag.BoolVar(&flagVersion, "v", false, "Show version")
+	flag.BoolVar(&flagVersion, "version", false, "Show version")
 	flag.BoolVar(&flagHelp, "h", false, "Show help screen")
 	flag.BoolVar(&flagHelp, "help", false, "Show help screen")
 
 	flag.Usage = printHelp
 	flag.Parse()
+
+	if flagVersion {
+		fmt.Printf("hx-ollama version %s\n", version)
+		return
+	}
 
 	args := flag.Args()
 
@@ -259,14 +320,11 @@ func main() {
 		cfg.Model = flagModel
 	}
 
-	// Ensure Host starts with scheme http:// or https://
-	if !strings.HasPrefix(cfg.Host, "http://") && !strings.HasPrefix(cfg.Host, "https://") {
-		cfg.Host = "http://" + cfg.Host
-	}
+	cfg.Host = normalizeHostURL(cfg.Host)
 
 	if action == "setup" || action == "init" || action == "install-helix" {
 		fmt.Println("=================================================================")
-		fmt.Println("   hx-ollama Go Static Binary Location Overview")
+		fmt.Printf("   hx-ollama (v%s) Go Static Binary Location Overview\n", version)
 		fmt.Println("=================================================================")
 		fmt.Println("1. Target Binary: ~/.local/bin/hx-ollama")
 		fmt.Println("2. Config File:   ~/.config/hx-ollama/config.json")
@@ -277,10 +335,10 @@ func main() {
 		return
 	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := newHTTPClient()
 
 	if action == "models" {
-		url := strings.TrimRight(cfg.Host, "/") + "/api/tags"
+		url := cfg.Host + "/api/tags"
 		resp, err := client.Get(url)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[hx-ollama Error]: Could not connect to Ollama at %s: %v\n", cfg.Host, err)
@@ -314,6 +372,8 @@ func main() {
 		flagKeepCode = true
 	case "docs":
 		sysPrompt = systemPromptDocs
+	case "complete":
+		sysPrompt = systemPromptComplete
 	case "generate":
 		sysPrompt = systemPromptGenerate
 	}
@@ -352,7 +412,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	url := strings.TrimRight(cfg.Host, "/") + "/api/generate"
+	url := cfg.Host + "/api/generate"
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		handleError(stdinText, fmt.Sprintf("Could not connect to Ollama server at %s. Ensure 'ollama serve' is running.", cfg.Host), cfg)
@@ -394,7 +454,6 @@ func main() {
 	}
 }
 
-// Read stdin with 50ms timeout if non-blocking
 func readStdin() string {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
