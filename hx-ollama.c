@@ -1,6 +1,7 @@
 /*
   hx-ollama.c: Fast, Zero-Dependency C Static Binary for Helix Editor + Ollama AI
-  Supports POSIX Sockets, local or LAN Ollama hosts (OLLAMA_HOST), and STB-style cJSON parsing.
+  Supports POSIX Sockets, local or LAN Ollama hosts (OLLAMA_HOST), ~/.config/hx-ollama/config.json,
+  and STB-style cJSON parsing.
 */
 
 #include <stdio.h>
@@ -16,7 +17,7 @@
 #include "cJSON.h"
 
 #define DEFAULT_HOST "http://localhost:11434"
-#define DEFAULT_TIMEOUT 60
+#define DEFAULT_MODEL "qwen2.5-coder:14b-instruct"
 
 // System Prompts
 static const char *SYSTEM_PROMPT_EDIT = 
@@ -70,11 +71,9 @@ static char *strip_code_fences(const char *text) {
     char *out = strdup(text);
     char *p = out;
     
-    // Skip whitespace
     while (isspace((unsigned char)*p)) p++;
     
     if (strncmp(p, "```", 3) == 0) {
-        // Skip first line ```python
         char *first_line_end = strchr(p, '\n');
         if (first_line_end) {
             p = first_line_end + 1;
@@ -116,12 +115,48 @@ static char *read_stdin_nonblocking(void) {
     return NULL;
 }
 
-// Socket HTTP Post Request
-static char *http_post(const char *host_url, const char *path, const char *json_payload) {
+// Config file reader (~/.config/hx-ollama/config.json)
+static void load_config_file(char *host_out, size_t host_size, char *model_out, size_t model_size) {
+    const char *home = getenv("HOME");
+    if (!home) return;
+    
+    char cfg_path[512];
+    snprintf(cfg_path, sizeof(cfg_path), "%s/.config/hx-ollama/config.json", home);
+    
+    FILE *f = fopen(cfg_path, "r");
+    if (!f) return;
+    
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    
+    if (sz > 0) {
+        char *buf = malloc(sz + 1);
+        fread(buf, 1, sz, f);
+        buf[sz] = '\0';
+        
+        cJSON *json = cJSON_Parse(buf);
+        if (json) {
+            cJSON *h = cJSON_GetObjectItem(json, "host");
+            if (h && h->valuestring && *h->valuestring) {
+                strncpy(host_out, h->valuestring, host_size - 1);
+            }
+            cJSON *m = cJSON_GetObjectItem(json, "model");
+            if (m && m->valuestring && *m->valuestring) {
+                strncpy(model_out, m->valuestring, model_size - 1);
+            }
+            cJSON_Delete(json);
+        }
+        free(buf);
+    }
+    fclose(f);
+}
+
+// Socket HTTP Request (GET or POST)
+static char *http_request(const char *method, const char *host_url, const char *path, const char *json_payload) {
     char hostname[256] = "localhost";
     int port = 11434;
 
-    // Parse host_url (e.g. http://192.168.1.100:11434 or localhost:11434)
     const char *p = host_url;
     if (strncmp(p, "http://", 7) == 0) p += 7;
     else if (strncmp(p, "https://", 8) == 0) p += 8;
@@ -162,20 +197,21 @@ static char *http_post(const char *host_url, const char *path, const char *json_
         return NULL;
     }
 
-    // Build HTTP POST Header
     char header[1024];
+    size_t payload_len = json_payload ? strlen(json_payload) : 0;
     int header_len = snprintf(header, sizeof(header),
-        "POST %s HTTP/1.1\r\n"
+        "%s %s HTTP/1.1\r\n"
         "Host: %s:%d\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %zu\r\n"
         "Connection: close\r\n\r\n",
-        path, hostname, port, strlen(json_payload));
+        method, path, hostname, port, payload_len);
 
     write(sockfd, header, header_len);
-    write(sockfd, json_payload, strlen(json_payload));
+    if (json_payload && payload_len > 0) {
+        write(sockfd, json_payload, payload_len);
+    }
 
-    // Read Response
     size_t resp_cap = 16384, resp_len = 0;
     char *response = malloc(resp_cap);
     ssize_t bytes_read;
@@ -192,7 +228,6 @@ static char *http_post(const char *host_url, const char *path, const char *json_
     response[resp_len] = '\0';
     close(sockfd);
 
-    // Skip HTTP headers to get JSON body
     char *body = strstr(response, "\r\n\r\n");
     if (body) {
         char *ret = strdup(body + 4);
@@ -203,7 +238,6 @@ static char *http_post(const char *host_url, const char *path, const char *json_
     return response;
 }
 
-// Helper: Format Output
 static char *format_output(const char *raw, int code_only) {
     if (code_only) {
         return strip_code_fences(raw);
@@ -214,8 +248,18 @@ static char *format_output(const char *raw, int code_only) {
 int main(int argc, char **argv) {
     const char *action = "";
     const char *custom_prompt = "";
-    const char *host = getenv("OLLAMA_HOST") ? getenv("OLLAMA_HOST") : DEFAULT_HOST;
-    const char *model = "qwen2.5-coder:14b-instruct";
+    
+    char host_buf[256] = DEFAULT_HOST;
+    char model_buf[128] = DEFAULT_MODEL;
+    
+    load_config_file(host_buf, sizeof(host_buf), model_buf, sizeof(model_buf));
+
+    if (getenv("OLLAMA_HOST")) {
+        strncpy(host_buf, getenv("OLLAMA_HOST"), sizeof(host_buf) - 1);
+    }
+
+    const char *host = host_buf;
+    const char *model = model_buf;
     int keep_code = 0;
     int code_only = 1;
 
@@ -229,7 +273,7 @@ int main(int argc, char **argv) {
         else custom_prompt = argv[i];
     }
 
-    if (strcmp(action, "setup") == 0 || strcmp(action, "init") == 0) {
+    if (strcmp(action, "setup") == 0 || strcmp(action, "init") == 0 || strcmp(action, "install-helix") == 0) {
         printf("=================================================================\n");
         printf("   hx-ollama C Static Binary Location Overview\n");
         printf("=================================================================\n");
@@ -238,6 +282,30 @@ int main(int argc, char **argv) {
         printf("3. Helix Config:  ~/.config/helix/config.toml\n");
         printf("=================================================================\n\n");
         printf("Helix Configuration Snippet:\n%s\n", HELIX_CONFIG_SNIPPET);
+        return 0;
+    }
+
+    if (strcmp(action, "models") == 0) {
+        char *resp = http_request("GET", host, "/api/tags", NULL);
+        if (resp) {
+            cJSON *json = cJSON_Parse(resp);
+            if (json) {
+                cJSON *models = cJSON_GetObjectItem(json, "models");
+                if (models && models->type == cJSON_Array) {
+                    printf("Installed Models on %s:\n", host);
+                    cJSON *m = models->child;
+                    while (m) {
+                        cJSON *name = cJSON_GetObjectItem(m, "name");
+                        if (name && name->valuestring) {
+                            printf("  - %s\n", name->valuestring);
+                        }
+                        m = m->next;
+                    }
+                }
+                cJSON_Delete(json);
+            }
+            free(resp);
+        }
         return 0;
     }
 
@@ -252,7 +320,6 @@ int main(int argc, char **argv) {
     } else if (strcmp(action, "docs") == 0) sys_prompt = SYSTEM_PROMPT_DOCS;
     else if (strcmp(action, "generate") == 0) sys_prompt = SYSTEM_PROMPT_GENERATE;
 
-    // Build Prompt JSON
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "model", model);
     cJSON_AddBoolToObject(root, "stream", 0);
@@ -275,7 +342,7 @@ int main(int argc, char **argv) {
     char *payload = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
 
-    char *resp_body = http_post(host, "/api/generate", payload);
+    char *resp_body = http_request("POST", host, "/api/generate", payload);
     free(payload);
 
     if (resp_body) {
