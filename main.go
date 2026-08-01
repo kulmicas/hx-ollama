@@ -36,7 +36,7 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = ":pipe hx-ollama explain"
+x = [":vnew", ":insert-output hx-ollama explain", ":set-language markdown"]
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 `
@@ -53,9 +53,13 @@ const systemPromptFix = "You are an expert AI debugger integrated into the Helix
 	"Do NOT include any introduction, explanations, or conversational text.\n" +
 	"Your entire response will replace the user's selection in the editor."
 
-const systemPromptExplain = "You are an expert software developer and technical communicator integrated into Helix text editor.\n" +
-	"Analyze the provided code selection and explain clearly how it works, key data structures, algorithms, and potential edge cases.\n" +
-	"Format your output with clear, concise markdown headings and bullet points."
+const systemPromptExplain = "You are an expert AI technical communicator writing a side-by-side code review scratchpad.\n" +
+	"Analyze the provided code selection and explain clearly how it works.\n" +
+	"Format your response as a clean, structured Markdown document using the following layout:\n" +
+	"## 📌 Executive Summary\n\n" +
+	"## 🧠 Logic & Data Flow\n\n" +
+	"## ⚠️ Edge Cases & Safety\n\n" +
+	"## ⏱️ Time & Space Complexity\n"
 
 const systemPromptDocs = "You are an expert AI code documenter integrated into Helix text editor.\n" +
 	"Add clear, concise docstrings, inline comments, and type hints/annotations to the provided code following standard style guidelines for the language.\n" +
@@ -101,6 +105,82 @@ type ModelItem struct {
 
 type TagsResponse struct {
 	Models []ModelItem `json:"models"`
+}
+
+type ProjectConfig struct {
+	CommentInstructions string `json:"_comment_instructions,omitempty"`
+	Instructions        string `json:"instructions"`
+	CommentModel        string `json:"_comment_model,omitempty"`
+	Model               string `json:"model,omitempty"`
+}
+
+func loadProjectContext() (instructions string, modelOverride string) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", ""
+	}
+
+	for {
+		jsonPath := filepath.Join(dir, ".hx-ollama.json")
+		if data, err := os.ReadFile(jsonPath); err == nil {
+			var pCfg ProjectConfig
+			if err := json.Unmarshal(data, &pCfg); err == nil {
+				return pCfg.Instructions, pCfg.Model
+			}
+		}
+
+		txtPath := filepath.Join(dir, ".hx-ollama")
+		if data, err := os.ReadFile(txtPath); err == nil {
+			return strings.TrimSpace(string(data)), ""
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return "", ""
+}
+
+func handleContextCommand(args []string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfgPath := filepath.Join(cwd, ".hx-ollama.json")
+	instructions := ""
+	if len(args) > 0 {
+		instructions = strings.Join(args, " ")
+	}
+
+	pCfg := ProjectConfig{
+		CommentInstructions: "Custom guidelines for this codebase (e.g. Python 3.11, FastAPI, C23, React + TS, etc.)",
+		Instructions:        instructions,
+		CommentModel:        "Optional model override for this specific project (leave empty to use global default)",
+		Model:               "",
+	}
+
+	data, err := json.MarshalIndent(pCfg, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error encoding .hx-ollama.json: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := os.WriteFile(cfgPath, data, 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", cfgPath, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Initialized project context file: %s\n", cfgPath)
+	if instructions != "" {
+		fmt.Printf("   Instructions set to: \"%s\"\n", instructions)
+	} else {
+		fmt.Println("   Edit .hx-ollama.json to add custom guidelines or model overrides for this repository.")
+	}
 }
 
 func printHelp() {
@@ -322,6 +402,16 @@ func main() {
 
 	cfg.Host = normalizeHostURL(cfg.Host)
 
+	if action == "context" || action == "init-project" {
+		handleContextCommand(args[1:])
+		return
+	}
+
+	projInstructions, projModel := loadProjectContext()
+	if projModel != "" && flagModel == "" {
+		cfg.Model = projModel
+	}
+
 	if action == "setup" || action == "init" || action == "install-helix" {
 		fmt.Println("=================================================================")
 		fmt.Printf("   hx-ollama (v%s) Go Static Binary Location Overview\n", version)
@@ -376,6 +466,10 @@ func main() {
 		sysPrompt = systemPromptComplete
 	case "generate":
 		sysPrompt = systemPromptGenerate
+	}
+
+	if projInstructions != "" {
+		sysPrompt = fmt.Sprintf("Project Guidelines:\n%s\n\n%s", projInstructions, sysPrompt)
 	}
 
 	if flagRaw {

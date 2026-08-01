@@ -106,28 +106,53 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = ":pipe hx-ollama explain"
+x = [":vnew", ":insert-output hx-ollama explain", ":set-language markdown"]
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 ```
 
-> **Note on Helix Keybinding Syntax (`@`)**:
-> Keybindings starting with `:` act as immediate RPC calls. To allow typing custom prompts at Helix's command bar, keybindings use macro syntax (`@`), e.g. `e = "@|hx-ollama edit<space>"`.
+> **Note on Side-by-Side Explanation Scratchpad (`Space + o + x`)**:
+> `Space + o + x` opens a side-by-side vertical scratchpad split (`:vnew`), streams the AI's structured explanation into the new window, and applies Markdown syntax highlighting. Your original source file remains **100% untouched** on the left.
 
 ---
 
 ## 🛠️ Action Reference
 
-| Action | Description | Keybinding | Output Format |
+| Action | Description | Keybinding / Command | Output Format |
 | :--- | :--- | :--- | :--- |
 | `edit [prompt]` | Refactors selection based on prompt instruction | `Space + o + e` | Raw Code |
 | `fix` | Analyzes selection and fixes bugs or syntax errors | `Space + o + f` | Raw Code |
-| `explain` | Explains selected code in detail | `Space + o + x` | Code + Markdown Explanation |
+| `explain` | Explains selected code in side-by-side split | `Space + o + x` | Markdown Scratchpad Split |
 | `docs` | Adds docstrings, comments, and type hints to selection | `Space + o + d` | Raw Code |
 | `complete` | Fills in missing functions or logic implementations | `Space + o + c` | Raw Code |
 | `generate <prompt>` | Generates new code from scratch | `Space + o + g` | Raw Code |
 | `models` | Lists installed Ollama models on host | `Space + o + m` | Terminal List |
-| `setup` | Shows file locations and prints Helix config snippet | Terminal | Overview |
+| `context [text]` | Creates `.hx-ollama.json` project rules file | Terminal (`hx-ollama context`) | Local Config File |
+| `setup` | Shows file locations and prints Helix config snippet | Terminal (`hx-ollama setup`) | Overview |
+
+---
+
+## 📁 Project-Local Context & Rules (`.hx-ollama.json`)
+
+To set custom instructions or model overrides for a specific codebase, run in your terminal from inside your project folder:
+
+```bash
+hx-ollama context "Python 3.11 FastAPI project. Use PEP8 and native type hints."
+```
+
+This creates `.hx-ollama.json` in your project root:
+
+```json
+{
+  "_comment_instructions": "Custom guidelines for this codebase (e.g. Python 3.11, FastAPI, C23, React + TS, etc.)",
+  "instructions": "Python 3.11 FastAPI project. Use PEP8 and native type hints.",
+
+  "_comment_model": "Optional model override for this specific project (leave empty to use global default)",
+  "model": ""
+}
+```
+
+`hx-ollama` automatically searches upwards from any subfolder to find `.hx-ollama.json` and include your project guidelines in all AI prompts.
 
 ---
 
