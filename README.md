@@ -2,6 +2,10 @@
 
 > **Fast, Zero-Dependency Local & LAN AI Integration for Helix Editor**
 
+> [!WARNING]
+> ⚠️ **DISCLAIMER & HEALTH WARNING**: This repository is 100% pure AI slop built through raw **vibecoding** with AI agents! 🤖✨  
+> I built this to experiment with pair-programming with AI coding agents. Miraculously, it compiles into a zero-dependency static binary, works blazingly fast, and hasn't blown up my machine yet. Use at your own risk, or vibe along! 🏄‍♂️
+
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 [![Platform: macOS | Linux](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Arch-darkgreen?style=for-the-badge)](https://github.com)
