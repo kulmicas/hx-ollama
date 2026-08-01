@@ -106,14 +106,14 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = ":sh hx-ollama -f %val{filename} explain"
-a = "@:sh<space>hx-ollama<space>-f<space>%val{filename}<space>ask<space>"
+x = ":pipe-to hx-ollama explain"
+a = "@:pipe-to<space>hx-ollama<space>ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 ```
 
-> **Note on Code Preservation (`Space + o + x` & `Space + o + a`)**:
-> `explain` and `ask` preserve your original code selection at the top and append the AI's explanation/answer underneath `---`. If Ollama is offline or returns an error, your original code is kept 100% safe and intact.
+> **Note on Helix Popup Overlays (`:pipe-to`)**:
+> Helix has a built-in command **`:pipe-to`**. It pipes your visual code selection into `hx-ollama` via `stdin`, but instead of replacing your code in the buffer, it displays the AI's response inside Helix's **built-in terminal output popup overlay** at the bottom of your screen. Your source code file remains **100% untouched**.
 
 ---
 
@@ -123,8 +123,8 @@ c = ":pipe hx-ollama complete"
 | :--- | :--- | :--- | :--- |
 | `edit [prompt]` | Refactors selection based on prompt instruction | `Space + o + e` | Raw Code Replacement |
 | `fix` | Analyzes selection and fixes bugs or syntax errors | `Space + o + f` | Raw Code Replacement |
-| `explain` | Explains selected code (appends below code) | `Space + o + x` | Code + Markdown Explanation |
-| `ask [question]` | Answers custom question about selection | `Space + o + a` | Code + Markdown Answer |
+| `explain` | Explains selected code in Helix popup overlay | `Space + o + x` | Helix Terminal Popup (`:pipe-to`) |
+| `ask [question]` | Answers custom question in Helix popup overlay | `Space + o + a` | Helix Terminal Popup (`:pipe-to`) |
 | `docs` | Adds docstrings, comments, and type hints to selection | `Space + o + d` | Raw Code Replacement |
 | `complete` | Fills in missing functions or logic implementations | `Space + o + c` | Raw Code Replacement |
 | `generate <prompt>` | Generates new code from scratch | `Space + o + g` | Raw Code Insertion |
