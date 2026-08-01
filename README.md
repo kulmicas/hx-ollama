@@ -1,16 +1,16 @@
-# `hx-ollama`: Pure C Local/LAN AI Integration for Helix Editor
+# `hx-ollama`: Portable Go Local/LAN AI Integration for Helix Editor
 
-`hx-ollama` is a **35 KB, ultra-fast (<0.2ms startup), zero-dependency static binary** written in pure C. It connects local or LAN-hosted **Ollama AI models** with **Helix Editor (`hx`)** via Helix's native `:pipe` (`|`), `:append-output`, and `:insert-output` features.
+`hx-ollama` is a **fast, zero-dependency static binary** written in pure Go. It connects local or LAN-hosted **Ollama AI models** with **Helix Editor (`hx`)** via Helix's native `:pipe` (`|`), `:append-output`, and `:insert-output` features.
 
 ---
 
 ## ✨ Key Highlights
 
-- ⚡ **Ultra-Fast & Lightweight**: ~35 KB static binary, starts in `< 0.2ms`.
-- 🐍 **Zero External Dependencies**: Built with POSIX Sockets (`sys/socket.h`) and STB-style `cJSON`. No Python, Node, Go, or external HTTP libraries required.
+- ⚡ **Ultra-Fast & Self-Contained**: Statically linked binary (`CGO_ENABLED=0`), zero runtime dependencies.
 - 🌐 **Local & LAN AI Support**: Easily connects to Ollama running locally or on another machine on your network (`http://192.168.x.x:11434` or `OLLAMA_HOST`).
 - 🧼 **Smart Code Fence Stripping**: Automatically removes markdown code fence wrappers (```python ... ```) for clean in-place buffer replacement.
-
+- 💡 **Preserves Code on Explanation**: `explain` appends structured explanations below your code without wiping it out.
+- 🛡️ **Fail-Safe Fallback**: If Ollama is offline or hits an error, original code selection is preserved so Helix **never deletes your code**.
 
 ---
 
@@ -53,11 +53,11 @@ ollama run qwen2.5-coder:14b-instruct "write a python quicksort function"
 ```bash
 make install
 ```
-*(This compiles `hx-ollama.c` and copies the 35 KB binary to `~/.local/bin/hx-ollama`).*
+*(This compiles `main.go` and installs the binary to `~/.local/bin/hx-ollama`).*
 
-Or compile directly with `gcc` or `clang`:
+Or compile directly with `go`:
 ```bash
-gcc -O3 hx-ollama.c cJSON.c -o ~/.local/bin/hx-ollama
+go build -o ~/.local/bin/hx-ollama main.go
 ```
 
 ---
@@ -90,31 +90,27 @@ c = ":pipe hx-ollama complete"
 
 ## ⚙️ Configuration (`~/.config/hx-ollama/config.json`)
 
-You can configure your local or LAN Ollama endpoint in `~/.config/hx-ollama/config.json`:
+Running `hx-ollama setup` or `make install` creates a template config file at `~/.config/hx-ollama/config.json`:
 
 ```json
 {
+  "_comment_host": "URL of local or LAN Ollama server. Examples: http://localhost:11434 or http://192.168.1.100:11434",
   "host": "http://localhost:11434",
-  "model": "qwen2.5-coder:14b-instruct"
+
+  "_comment_model": "Ollama model tag for coding (e.g. qwen2.5-coder:14b-instruct, deepseek-r1, codellama)",
+  "model": "qwen2.5-coder:14b-instruct",
+
+  "_comment_temperature": "Sampling temperature from 0.0 (precise code refactoring) to 1.0 (creative generation)",
+  "temperature": 0.2
 }
 ```
 
-*Or temporarily set a remote LAN AI host via environment variable:*
+---
+
+## 🚀 Terminal Usage & Help
+
 ```bash
-export OLLAMA_HOST="http://192.168.1.100:11434"
+hx-ollama --help
+hx-ollama models
+hx-ollama setup
 ```
-
----
-
-## 🚀 How to Use in Helix
-
-- **Refactor Selection**: Select text in visual mode (`v`) $\rightarrow$ `Space + o + e` $\rightarrow$ type `convert to async` $\rightarrow$ `Enter`.
-- **Auto-Fix Bugs**: Select code in visual mode (`v`) $\rightarrow$ `Space + o + f`.
-- **Explain Code**: Select code in visual mode (`v`) $\rightarrow$ `Space + o + x`. Appends explanation below code.
-- **Generate New Code**: In normal mode $\rightarrow$ `Space + o + g` $\rightarrow$ type `write a python json parser` $\rightarrow$ `Enter`.
-- **List Installed AI Models**: Type `:sh hx-ollama models`.
-
----
-
-## 📄 License
-MIT License.

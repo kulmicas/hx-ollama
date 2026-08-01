@@ -1,17 +1,25 @@
-# Makefile for hx-ollama (Pure C Static Binary)
+# Makefile for hx-ollama (Supports Go and C static builds)
 
-BINARY_NAME = hx-ollama
-CC ?= gcc
-CFLAGS ?= -O3 -Wall
-INSTALL_DIR ?= $(HOME)/.local/bin
+BINARY_NAME=hx-ollama
+INSTALL_DIR=$(HOME)/.local/bin
+GO_EXISTS := $(shell command -v go 2> /dev/null)
 
 .PHONY: all build install clean
 
 all: build
 
 build:
+ifdef GO_EXISTS
+	@echo "📦 Building with Go..."
 	@mkdir -p bin
-	$(CC) $(CFLAGS) hx-ollama.c cJSON.c -o bin/$(BINARY_NAME)
+	CGO_ENABLED=0 go build -o bin/$(BINARY_NAME) main.go
+	@echo "✅ Built bin/$(BINARY_NAME) using Go successfully."
+else
+	@echo "📦 Go not found. Building with C compiler (gcc/clang)..."
+	@mkdir -p bin
+	$(CC) -O3 -Wall hx-ollama.c cJSON.c -o bin/$(BINARY_NAME)
+	@echo "✅ Built bin/$(BINARY_NAME) using C successfully."
+endif
 
 install: build
 	@mkdir -p $(INSTALL_DIR)
