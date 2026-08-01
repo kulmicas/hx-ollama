@@ -106,16 +106,14 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = "@y:vnew<ret>p:pipe hx-ollama explain<ret>:set-language markdown<ret>"
-a = "@:sh<space>hx-ollama<space>ask<space>"
+x = ":pipe hx-ollama explain"
+a = "@|hx-ollama ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 ```
 
-> **Note on Custom Questions (`Space + o + a`) & Explain Scratchpad (`Space + o + x`)**:
-> - `Space + o + a`: Opens a Markdown scratchpad split (`:vnew`), leaving your cursor blinking so you can **type any custom question** about your selection!
-> - `Space + o + x`: Streams a structured code breakdown into the scratchpad split.  
-> Your original source file remains **100% untouched** on the left.
+> **Note on Code Preservation (`Space + o + x` & `Space + o + a`)**:
+> `explain` and `ask` preserve your original code selection at the top and append the AI's explanation/answer underneath `---`. If Ollama is offline or returns an error, your original code is kept 100% safe and intact.
 
 ---
 
@@ -123,13 +121,13 @@ c = ":pipe hx-ollama complete"
 
 | Action | Description | Keybinding / Command | Output Format |
 | :--- | :--- | :--- | :--- |
-| `edit [prompt]` | Refactors selection based on prompt instruction | `Space + o + e` | Raw Code |
-| `fix` | Analyzes selection and fixes bugs or syntax errors | `Space + o + f` | Raw Code |
-| `explain` | Explains selected code in side-by-side split | `Space + o + x` | Markdown Scratchpad Split |
-| `ask [question]` | Answers any custom question about selection in split | `Space + o + a` | Markdown Scratchpad Split |
-| `docs` | Adds docstrings, comments, and type hints to selection | `Space + o + d` | Raw Code |
-| `complete` | Fills in missing functions or logic implementations | `Space + o + c` | Raw Code |
-| `generate <prompt>` | Generates new code from scratch | `Space + o + g` | Raw Code |
+| `edit [prompt]` | Refactors selection based on prompt instruction | `Space + o + e` | Raw Code Replacement |
+| `fix` | Analyzes selection and fixes bugs or syntax errors | `Space + o + f` | Raw Code Replacement |
+| `explain` | Explains selected code (appends below code) | `Space + o + x` | Code + Markdown Explanation |
+| `ask [question]` | Answers custom question about selection | `Space + o + a` | Code + Markdown Answer |
+| `docs` | Adds docstrings, comments, and type hints to selection | `Space + o + d` | Raw Code Replacement |
+| `complete` | Fills in missing functions or logic implementations | `Space + o + c` | Raw Code Replacement |
+| `generate <prompt>` | Generates new code from scratch | `Space + o + g` | Raw Code Insertion |
 | `models` | Lists installed Ollama models on host | `Space + o + m` | Terminal List |
 | `context [text]` | Creates `.hx-ollama.json` project rules file | Terminal (`hx-ollama context`) | Local Config File |
 | `setup` | Shows file locations and prints Helix config snippet | Terminal (`hx-ollama setup`) | Overview |

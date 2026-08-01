@@ -36,8 +36,8 @@ m = ":sh hx-ollama models"
 [keys.select.space.o]
 e = "@|hx-ollama edit<space>"
 f = ":pipe hx-ollama fix"
-x = "@y:vnew<ret>p:pipe hx-ollama explain<ret>:set-language markdown<ret>"
-a = "@:sh<space>hx-ollama<space>ask<space>"
+x = ":pipe hx-ollama explain"
+a = "@|hx-ollama ask<space>"
 d = ":pipe hx-ollama docs"
 c = ":pipe hx-ollama complete"
 `
@@ -464,7 +464,7 @@ func main() {
 	case "ask":
 		sysPrompt = systemPromptAsk
 		codeOnly = false
-		flagKeepCode = false
+		flagKeepCode = true
 	case "docs":
 		sysPrompt = systemPromptDocs
 	case "complete":
