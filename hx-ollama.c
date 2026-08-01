@@ -245,6 +245,41 @@ static char *format_output(const char *raw, int code_only) {
     return strdup(raw);
 }
 
+static void print_help(void) {
+    printf("hx-ollama: Pure C Static Binary for Helix Editor + Ollama AI\n\n");
+    printf("USAGE:\n");
+    printf("  hx-ollama [OPTIONS] <ACTION> [PROMPT...]\n");
+    printf("  echo \"code\" | hx-ollama [OPTIONS] <ACTION> [PROMPT...]\n\n");
+    printf("ACTIONS:\n");
+    printf("  edit [prompt]     Refactor piped code according to prompt instruction\n");
+    printf("  fix               Analyze and fix bugs, syntax, or logic errors in selection\n");
+    printf("  explain           Explain selected code in detail (appends explanation below code)\n");
+    printf("  docs              Add docstrings, comments, and type hints to selected code\n");
+    printf("  complete          Complete missing logic in code selection\n");
+    printf("  generate <prompt> Generate new code from scratch for :append-output / :insert-output\n");
+    printf("  models            List installed Ollama AI models on host\n");
+    printf("  setup / init      Display file locations and print Helix configuration snippet\n\n");
+    printf("OPTIONS:\n");
+    printf("  -m <model>        Specify model (e.g. qwen2.5-coder:14b-instruct, deepseek-r1)\n");
+    printf("  --host <url>      Specify Ollama host URL (e.g. http://192.168.1.100:11434)\n");
+    printf("  --raw             Force raw code output (strip code fences)\n");
+    printf("  --markdown        Preserve markdown output (do not strip code fences)\n");
+    printf("  --keep-code       Preserve original code selection above response\n");
+    printf("  -h, --help        Show this help screen\n\n");
+    printf("ENVIRONMENT VARIABLES:\n");
+    printf("  OLLAMA_HOST       Default Ollama host URL (e.g. http://192.168.1.100:11434)\n\n");
+    printf("EXAMPLES:\n");
+    printf("  In Helix Visual Mode:\n");
+    printf("    :pipe hx-ollama edit \"convert to async\"\n");
+    printf("    :pipe hx-ollama fix\n");
+    printf("    :pipe hx-ollama explain\n\n");
+    printf("  In Helix Normal Mode:\n");
+    printf("    :append-output hx-ollama generate \"write a fibonacci function in python\"\n\n");
+    printf("  In Terminal:\n");
+    printf("    hx-ollama models\n");
+    printf("    hx-ollama setup\n");
+}
+
 int main(int argc, char **argv) {
     const char *action = "";
     const char *custom_prompt = "";
@@ -264,13 +299,22 @@ int main(int argc, char **argv) {
     int code_only = 1;
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) host = argv[++i];
+        if ((strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "help") == 0)) {
+            print_help();
+            return 0;
+        }
+        else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) host = argv[++i];
         else if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) model = argv[++i];
         else if (strcmp(argv[i], "--raw") == 0) code_only = 1;
         else if (strcmp(argv[i], "--markdown") == 0) code_only = 0;
         else if (strcmp(argv[i], "--keep-code") == 0) keep_code = 1;
         else if (!*action) action = argv[i];
         else custom_prompt = argv[i];
+    }
+
+    if (!*action && argc == 1 && isatty(STDIN_FILENO)) {
+        print_help();
+        return 0;
     }
 
     if (strcmp(action, "setup") == 0 || strcmp(action, "init") == 0 || strcmp(action, "install-helix") == 0) {
