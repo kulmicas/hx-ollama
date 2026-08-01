@@ -1,12 +1,391 @@
 #!/usr/bin/env python3
+"""
+hx-ollama: Helix Editor + Ollama AI Integration Tool
+Self-contained zero-dependency CLI executable for Helix editor piping and generation.
+"""
+
 import sys
 import os
+import re
+import json
+import select
+import argparse
+import urllib.request
+import urllib.error
+from pathlib import Path
+from typing import List, Dict, Any, Optional
 
-# Ensure hx_ollama package can be loaded if run directly from repo or via symlink
-script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.insert(0, os.path.abspath(os.path.join(script_dir, "..")))
+# ==============================================================================
+# 1. Formatter & Code Fence Handling
+# ==============================================================================
 
-from hx_ollama.cli import main
+def strip_code_fences(text: str) -> str:
+    """Strips top-level markdown code fence wrappers (```python ... ```)."""
+    if not text:
+        return text
+
+    lines = text.strip().splitlines()
+
+    if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].strip() == "```":
+        lines = lines[1:-1]
+        return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+    code_block_match = re.search(r"```(?:\w+)?\n(.*?)```", text, re.DOTALL)
+    if code_block_match:
+        return code_block_match.group(1)
+
+    return text
+
+def format_output(response_text: str, code_only: bool = True) -> str:
+    """Formats LLM response. Strips code fences if code_only is True."""
+    if code_only:
+        return strip_code_fences(response_text)
+    return response_text
+
+# ==============================================================================
+# 2. System Prompts
+# ==============================================================================
+
+SYSTEM_PROMPT_EDIT = """You are an expert AI coding assistant integrated into the Helix text editor.
+Your task is to edit, refactor, or rewrite the provided code based on the user's instructions.
+CRITICAL RULE: Output ONLY the updated code. Do NOT wrap your output in markdown code blocks or ``` ``` fences.
+Do NOT include any introduction, explanations, markdown formatting, or conversational text.
+Your entire response will replace the user's selection in the editor."""
+
+SYSTEM_PROMPT_FIX = """You are an expert AI debugger integrated into the Helix text editor.
+Your task is to analyze the provided code snippet, identify any syntax errors, logical bugs, or type mismatches, and fix them.
+CRITICAL RULE: Output ONLY the corrected code. Do NOT wrap your output in markdown code blocks or ``` ``` fences.
+Do NOT include any introduction, explanations, or conversational text.
+Your entire response will replace the user's selection in the editor."""
+
+SYSTEM_PROMPT_EXPLAIN = """You are an expert software developer and technical communicator integrated into Helix text editor.
+Analyze the provided code selection and explain clearly how it works, key data structures, algorithms, and potential edge cases.
+Format your output with clear, concise markdown headings and bullet points."""
+
+SYSTEM_PROMPT_DOCS = """You are an expert AI code documenter integrated into Helix text editor.
+Add clear, concise docstrings, inline comments, and type hints/annotations to the provided code following standard style guidelines for the language.
+CRITICAL RULE: Output ONLY the code with documentation added. Do NOT wrap your output in markdown code blocks or ``` ``` fences.
+Do NOT include explanations outside of the code."""
+
+SYSTEM_PROMPT_COMPLETE = """You are an inline code completion AI integrated into Helix text editor.
+Complete the code logic naturally following the context and existing patterns.
+CRITICAL RULE: Output ONLY the completion code. Do NOT wrap your output in markdown code blocks or ``` ``` fences."""
+
+SYSTEM_PROMPT_GENERATE = """You are an expert AI software developer integrated into Helix text editor.
+Generate clean, production-ready code based on the user's prompt instruction.
+CRITICAL RULE: Output ONLY the generated code unless explicitly asked for explanation. Do NOT wrap your output in markdown code blocks or ``` ``` fences unless requested."""
+
+# ==============================================================================
+# 3. Configuration
+# ==============================================================================
+
+CONFIG_DIR = Path.home() / ".config" / "hx-ollama"
+CONFIG_FILE = CONFIG_DIR / "config.json"
+
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "host": "http://localhost:11434",
+    "model": "",
+    "temperature": 0.2,
+    "timeout": 60,
+    "preferred_models": [
+        "qwen2.5-coder",
+        "qwen2.5-coder:14b-instruct",
+        "qwen2.5-coder:7b",
+        "qwen2.5-coder:1.5b",
+        "deepseek-r1",
+        "codellama",
+        "llama3.2",
+        "llama3.1",
+        "mistral",
+    ]
+}
+
+def load_config() -> Dict[str, Any]:
+    """Loads configuration from ~/.config/hx-ollama/config.json if it exists."""
+    config = DEFAULT_CONFIG.copy()
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                user_config = json.load(f)
+                config.update(user_config)
+        except Exception:
+            pass
+    return config
+
+# ==============================================================================
+# 4. Ollama Client
+# ==============================================================================
+
+class OllamaClient:
+    def __init__(self, host: str = "http://localhost:11434", timeout: int = 60):
+        self.host = host.rstrip("/")
+        self.timeout = timeout
+
+    def check_connection(self) -> bool:
+        try:
+            req = urllib.request.Request(f"{self.host}/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    def list_models(self) -> List[str]:
+        try:
+            url = f"{self.host}/api/tags"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return [m["name"] for m in data.get("models", [])]
+        except Exception as e:
+            print(f"[hx-ollama] Warning: Failed to list models from {self.host}: {e}", file=sys.stderr)
+        return []
+
+    def resolve_model(self, requested_model: Optional[str], preferred_models: List[str]) -> str:
+        installed = self.list_models()
+        if not installed:
+            if requested_model:
+                return requested_model
+            raise RuntimeError(
+                f"No models found on Ollama server at {self.host}.\n"
+                f"Please pull a model using 'ollama pull qwen2.5-coder' or specify a model."
+            )
+
+        if requested_model:
+            for m in installed:
+                if m == requested_model or m.startswith(f"{requested_model}:"):
+                    return m
+            return requested_model
+
+        for pref in preferred_models:
+            for inst in installed:
+                if inst == pref or inst.startswith(f"{pref}:") or pref in inst:
+                    return inst
+
+        return installed[0]
+
+    def generate(
+        self,
+        model: str,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 0.2,
+    ) -> str:
+        url = f"{self.host}/api/generate"
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+            }
+        }
+        if system:
+            payload["system"] = system
+
+        data_bytes = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data_bytes,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                if resp.status == 200:
+                    response_data = json.loads(resp.read().decode("utf-8"))
+                    return response_data.get("response", "")
+                else:
+                    raise RuntimeError(f"Ollama returned HTTP {resp.status}")
+        except urllib.error.URLError as e:
+            raise RuntimeError(
+                f"Could not connect to Ollama at {self.host}.\n"
+                f"Ensure Ollama is running (`ollama serve`). Details: {e}"
+            )
+
+# ==============================================================================
+# 5. CLI & Helix Integration
+# ==============================================================================
+
+HELIX_CONFIG_SNIPPET = """
+# ==============================================================================
+# Helix Editor + Ollama AI Integration (hx-ollama)
+# ==============================================================================
+
+# Normal Mode Keybindings (Space + o for Ollama)
+[keys.normal.space.o]
+g = "@:append-output<space>hx-ollama<space>generate<space>"
+i = "@:insert-output<space>hx-ollama<space>generate<space>"
+m = ":sh hx-ollama models"
+
+# Visual / Selection Mode Keybindings (Space + o for Ollama)
+[keys.select.space.o]
+e = "@|hx-ollama edit<space>"
+f = ":pipe hx-ollama fix"
+x = ":pipe hx-ollama explain"
+d = ":pipe hx-ollama docs"
+c = ":pipe hx-ollama complete"
+"""
+
+def read_stdin(timeout: float = 0.05) -> str:
+    """Reads stdin non-blockingly if data is available."""
+    if not sys.stdin.isatty():
+        try:
+            rlist, _, _ = select.select([sys.stdin], [], [], timeout)
+            if rlist:
+                return sys.stdin.read()
+        except Exception:
+            return ""
+    return ""
+
+def main():
+    config = load_config()
+
+    parser = argparse.ArgumentParser(
+        prog="hx-ollama",
+        description="Helix Editor + Ollama AI Integration Tool via Pipe (|) and Append/Insert Output",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    parser.add_argument(
+        "action_or_prompt",
+        nargs="*",
+        help="Action (edit, fix, explain, docs, complete, generate, models, setup-helix, install-helix) or prompt"
+    )
+    parser.add_argument("-m", "--model", help="Specify Ollama model to use")
+    parser.add_argument("-t", "--temperature", type=float, help="Temperature setting (0.0 to 1.0)")
+    parser.add_argument("--host", help="Ollama host URL (default: http://localhost:11434)")
+    parser.add_argument("--raw", action="store_true", help="Force raw code output")
+    parser.add_argument("--markdown", action="store_true", help="Preserve markdown output")
+    parser.add_argument("--keep-code", action="store_true", help="Preserve original piped code and append response below")
+
+    args = parser.parse_args()
+
+    stdin_content = read_stdin()
+
+    positional = args.action_or_prompt
+    action = positional[0].lower() if positional else ""
+    extra_prompt = " ".join(positional[1:]) if len(positional) > 1 else ""
+
+    if action == "models":
+        client = OllamaClient(host=args.host or config["host"])
+        if not client.check_connection():
+            print(f"[hx-ollama] Error: Ollama is not running at {client.host}. Please start Ollama (`ollama serve`).", file=sys.stderr)
+            sys.exit(1)
+        models = client.list_models()
+        if models:
+            print("Installed Ollama Models:")
+            for m in models:
+                print(f"  - {m}")
+        else:
+            print("No Ollama models found. Pull a model using: `ollama pull qwen2.5-coder`")
+        return
+
+    if action == "setup-helix":
+        print("Copy and paste the following snippet into your Helix config (~/.config/helix/config.toml):")
+        print(HELIX_CONFIG_SNIPPET)
+        return
+
+    if action in ("install-helix", "init-helix"):
+        helix_config_dir = os.path.expanduser("~/.config/helix")
+        helix_config_file = os.path.join(helix_config_dir, "config.toml")
+        os.makedirs(helix_config_dir, exist_ok=True)
+
+        existing_content = ""
+        if os.path.exists(helix_config_file):
+            with open(helix_config_file, "r", encoding="utf-8") as f:
+                existing_content = f.read()
+
+        if "hx-ollama" in existing_content:
+            print(f"[hx-ollama] Notice: hx-ollama configuration is already present in {helix_config_file}")
+            return
+
+        with open(helix_config_file, "a", encoding="utf-8") as f:
+            if existing_content and not existing_content.endswith("\n"):
+                f.write("\n")
+            f.write(HELIX_CONFIG_SNIPPET)
+
+        print(f"✅ Successfully appended hx-ollama keybindings to {helix_config_file}!")
+        return
+
+    code_only = True
+    keep_code = args.keep_code
+    system_prompt = SYSTEM_PROMPT_EDIT
+    user_prompt = ""
+
+    if action == "fix":
+        system_prompt = SYSTEM_PROMPT_FIX
+        user_prompt = extra_prompt or "Fix any bugs, syntax errors, or logical issues in this code."
+    elif action == "explain":
+        system_prompt = SYSTEM_PROMPT_EXPLAIN
+        user_prompt = extra_prompt or "Explain this code in detail."
+        code_only = False
+        keep_code = True
+    elif action == "docs":
+        system_prompt = SYSTEM_PROMPT_DOCS
+        user_prompt = extra_prompt or "Add clear docstrings and comments to this code."
+    elif action == "complete":
+        system_prompt = SYSTEM_PROMPT_COMPLETE
+        user_prompt = extra_prompt or "Complete the logic for this code snippet."
+    elif action == "generate" or action == "create":
+        system_prompt = SYSTEM_PROMPT_GENERATE
+        user_prompt = extra_prompt or " ".join(positional)
+    elif action in ("edit", "refactor", "change", "transform"):
+        system_prompt = SYSTEM_PROMPT_EDIT
+        user_prompt = extra_prompt or "Refactor and clean up this code."
+    else:
+        full_instruction = " ".join(positional)
+        if stdin_content:
+            system_prompt = SYSTEM_PROMPT_EDIT
+            user_prompt = full_instruction or "Improve and refine this code."
+        else:
+            system_prompt = SYSTEM_PROMPT_GENERATE
+            user_prompt = full_instruction or "Generate the requested code."
+
+    if stdin_content:
+        full_prompt = f"User Request: {user_prompt}\n\nCode Context:\n{stdin_content}"
+    else:
+        full_prompt = user_prompt
+
+    if not full_prompt.strip():
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+
+    if args.raw:
+        code_only = True
+    elif args.markdown:
+        code_only = False
+
+    host = args.host or config.get("host", "http://localhost:11434")
+    temp = args.temperature if args.temperature is not None else config.get("temperature", 0.2)
+    timeout = config.get("timeout", 60)
+
+    client = OllamaClient(host=host, timeout=timeout)
+
+    req_model = args.model or config.get("model") or None
+    try:
+        model = client.resolve_model(req_model, config.get("preferred_models", []))
+    except Exception as e:
+        print(f"[hx-ollama] Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        raw_response = client.generate(
+            model=model,
+            prompt=full_prompt,
+            system=system_prompt,
+            temperature=temp,
+        )
+        formatted = format_output(raw_response, code_only=code_only)
+
+        if keep_code and stdin_content:
+            formatted = f"{stdin_content.rstrip()}\n\n---\n### 💡 Code Explanation\n{formatted}\n"
+
+        print(formatted, end="")
+    except Exception as e:
+        print(f"[hx-ollama] Error executing Ollama request: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
